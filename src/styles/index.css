@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+  
+  html, body, #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #040508;
+    color: #f3ebdd;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+}
+
+/* Amarante: expressive, playful, warm companion typography */
+.font-amarante,
+.font-dialogue,
+.font-handwritten {
+  font-family: 'Amarante', serif;
+}
+
+/* Unfolded physical astronomical cream paper map styling */
+.celestial-paper-map {
+  background-color: #f7f4ed;
+  background-image: 
+    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.4) 0%, rgba(239, 234, 222, 0.6) 80%, rgba(225, 218, 202, 0.95) 100%),
+    linear-gradient(to right, transparent 49.6%, rgba(135, 120, 100, 0.12) 50%, transparent 50.4%),
+    linear-gradient(to bottom, transparent 49.6%, rgba(135, 120, 100, 0.12) 50%, transparent 50.4%);
+  box-shadow: 
+    0 25px 70px -10px rgba(0, 0, 0, 0.9),
+    0 10px 25px -5px rgba(0, 0, 0, 0.7),
+    inset 0 0 40px rgba(180, 160, 130, 0.25);
+}
+
+/* Companion Entrance: subtle drift-in from below (700-1000ms) */
+@keyframes companionEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+  }
+}
+
+/* Subtle zero-g idle floating: tiny 4-5px amplitude, very slow 6s, no rotation */
+@keyframes subtleIdleFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* Very subtle stardust drift */
+@keyframes stardustTwinkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.15);
+  }
+}
+
+.animate-companion-entrance {
+  animation: companionEntrance 850ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-subtle-float {
+  animation: subtleIdleFloat 6s ease-in-out infinite;
+}
+
+.animate-zero-g {
+  animation: subtleIdleFloat 6s ease-in-out infinite;
+}
+
+.animate-stardust {
+  animation: stardustTwinkle 3.4s ease-in-out infinite;
+}
+
+/* Gentle physical map fold effect on departure */
+@keyframes mapGentleFold {
+  0% {
+    opacity: 1;
+    transform: perspective(1200px) rotateX(0deg) rotateZ(-0.4deg) scale(1);
+    filter: blur(0px);
+  }
+  60% {
+    opacity: 0.7;
+    transform: perspective(1200px) rotateX(15deg) rotateZ(-1deg) scale(0.94);
+    filter: blur(0.5px);
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(1200px) rotateX(30deg) rotateZ(-2deg) scale(0.86);
+    filter: blur(2px);
+    pointer-events: none;
+  }
+}
+
+.animate-map-fold {
+  animation: mapGentleFold 600ms cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+  pointer-events: none !important;
+}
+
+/* Accessibility: respect user prefers-reduced-motion settings */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-companion-entrance,
+  .animate-subtle-float,
+  .animate-zero-g,
+  .animate-stardust,
+  .animate-map-fold {
+    animation: none !important;
+  }
+}
