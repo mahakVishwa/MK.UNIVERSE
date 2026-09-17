@@ -46,9 +46,20 @@ export interface ParallaxLayerConfig {
   isInteractiveTarget?: boolean;
 }
 
+export type InteractiveEntity = 'education' | 'interests' | 'experience';
+
+export interface ViewedSectionsState {
+  educationViewed: boolean;
+  interestsViewed: boolean;
+  experienceViewed: boolean;
+}
+
 export interface ParallaxSceneProps {
   layers?: readonly ParallaxLayerConfig[];
   reducedMotion?: boolean;
   className?: string;
-  onLayerSelect?: (layerId: string) => void;
+  focusedEntity?: InteractiveEntity | null;
+  hoveredEntity?: InteractiveEntity | null;
+  onEntityHover?: (entity: InteractiveEntity | null) => void;
+  onEntitySelect?: (entity: InteractiveEntity) => void;
 }

@@ -1,3 +1,4 @@
+
 import { useState, useRef, useCallback, useEffect } from 'react';
 import gsap from 'gsap';
 import { Destination } from '../types/navigation';

@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ParallaxSceneProps } from './types';
 import { CORE_STAR_LAYERS, PARALLAX_SETTINGS } from './sceneConfig';
+import { ROLE_TO_ENTITY } from './contentData';
+import { SpatialHoverLabel } from './ui/SpatialHoverLabel';
 
 /**
  * ParallaxEnvironment25D:
@@ -14,6 +16,10 @@ export const ParallaxEnvironment25D: React.FC<ParallaxSceneProps> = ({
   layers = CORE_STAR_LAYERS,
   reducedMotion = false,
   className = '',
+  focusedEntity = null,
+  hoveredEntity = null,
+  onEntityHover,
+  onEntitySelect,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cameraRef = useRef<HTMLDivElement | null>(null);
@@ -226,11 +232,13 @@ export const ParallaxEnvironment25D: React.FC<ParallaxSceneProps> = ({
                   data-layer-role={layer.role}
                   data-depth-level={layer.depthLevel}
                   data-interactive={layer.isInteractiveTarget ? 'true' : 'false'}
-                  className="absolute inset-[-7%] w-[114%] h-[114%] pointer-events-none will-change-transform"
+                  className="absolute inset-[-7%] w-[114%] h-[114%] pointer-events-none will-change-transform transition-all duration-700 ease-out"
                   style={{
                     zIndex: layer.zIndex,
                     transformStyle: 'preserve-3d',
                     backfaceVisibility: 'hidden',
+                    opacity: focusedEntity ? 0.32 : 1,
+                    filter: focusedEntity ? 'brightness(0.65) blur(1px)' : 'none',
                   }}
                 >
                   <img
@@ -258,7 +266,7 @@ export const ParallaxEnvironment25D: React.FC<ParallaxSceneProps> = ({
                   data-layer-role={layer.role}
                   data-depth-level={layer.depthLevel}
                   data-interactive={layer.isInteractiveTarget ? 'true' : 'false'}
-                  className="absolute pointer-events-none will-change-transform"
+                  className="absolute pointer-events-none will-change-transform transition-all duration-700 ease-out"
                   style={{
                     left: '50%',
                     bottom: `${layer.bottomOffsetVh ?? 0}vh`,
@@ -267,6 +275,8 @@ export const ParallaxEnvironment25D: React.FC<ParallaxSceneProps> = ({
                     zIndex: layer.zIndex,
                     transformStyle: 'preserve-3d',
                     backfaceVisibility: 'hidden',
+                    opacity: focusedEntity ? 0.32 : 1,
+                    filter: focusedEntity ? 'brightness(0.65) blur(1px)' : 'none',
                   }}
                 >
                   <img
@@ -286,6 +296,42 @@ export const ParallaxEnvironment25D: React.FC<ParallaxSceneProps> = ({
             const cy = (layer.centerY ?? 0.5) * 100;
             const width = layer.widthVw ?? 30;
 
+            const entity = layer.isInteractiveTarget ? ROLE_TO_ENTITY[layer.role] : null;
+            const isThisFocused = entity !== null && focusedEntity === entity;
+            const isAnotherFocused = focusedEntity !== null && !isThisFocused;
+            const isThisHovered = entity !== null && hoveredEntity === entity && !focusedEntity;
+
+            const labelTexts: Record<string, string> = {
+              crystal: 'Education',
+              comet: 'Interests',
+              asteroid: 'Experience',
+            };
+
+            const glowStyles: Record<string, { hover: string; focus: string }> = {
+              crystal: {
+                hover: 'drop-shadow(0 0 20px rgba(192, 132, 252, 0.75))',
+                focus: 'drop-shadow(0 0 32px rgba(192, 132, 252, 0.95)) drop-shadow(0 0 60px rgba(147, 51, 234, 0.45)) brightness(1.15)',
+              },
+              comet: {
+                hover: 'drop-shadow(0 0 22px rgba(244, 114, 182, 0.75))',
+                focus: 'drop-shadow(0 0 32px rgba(244, 114, 182, 0.95)) drop-shadow(0 0 60px rgba(219, 39, 119, 0.45)) brightness(1.15)',
+              },
+              asteroid: {
+                hover: 'drop-shadow(0 0 20px rgba(56, 189, 248, 0.75))',
+                focus: 'drop-shadow(0 0 32px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 60px rgba(37, 99, 235, 0.45)) brightness(1.15)',
+              },
+            };
+
+            const glow = glowStyles[layer.role];
+            let imageFilter = 'none';
+            if (isThisFocused && glow) {
+              imageFilter = glow.focus;
+            } else if (isThisHovered && glow) {
+              imageFilter = glow.hover;
+            } else if (isAnotherFocused) {
+              imageFilter = 'brightness(0.65) blur(1px)';
+            }
+
             return (
               <div
                 key={layer.id}
@@ -297,25 +343,77 @@ export const ParallaxEnvironment25D: React.FC<ParallaxSceneProps> = ({
                 data-layer-role={layer.role}
                 data-depth-level={layer.depthLevel}
                 data-interactive={layer.isInteractiveTarget ? 'true' : 'false'}
-                className="absolute pointer-events-none will-change-transform"
+                className="absolute pointer-events-none will-change-transform transition-all duration-700 ease-out"
                 style={{
                   left: `${cx}%`,
                   top: `${cy}%`,
                   width: `${width}vw`,
                   transform: 'translate(-50%, -50%) translate3d(0px, 0px, 0px)',
-                  zIndex: layer.zIndex,
+                  zIndex: isThisFocused ? 60 : layer.zIndex,
                   transformStyle: 'preserve-3d',
                   backfaceVisibility: 'hidden',
+                  opacity: isAnotherFocused ? 0.32 : 1,
                 }}
               >
-                <img
-                  src={layer.src}
-                  alt={layer.alt}
-                  aria-hidden="true"
-                  draggable={false}
-                  onLoad={handleImageLoad}
-                  className="w-full h-auto block select-none pointer-events-none"
-                />
+                {/* Spatial Hover Label (Pinned relative to the entity in 2.5D space) */}
+                {isThisHovered && entity && (
+                  <div
+                    className={`absolute z-50 pointer-events-auto ${
+                      layer.role === 'comet'
+                        ? 'top-[78%] left-1/2 -translate-x-1/2'
+                        : '-top-8 left-1/2 -translate-x-1/2'
+                    }`}
+                  >
+                    <SpatialHoverLabel
+                      entity={entity}
+                      label={labelTexts[layer.role]}
+                      onClick={() => onEntitySelect?.(entity)}
+                    />
+                  </div>
+                )}
+
+                {entity ? (
+                  <button
+                    type="button"
+                    onClick={() => onEntitySelect?.(entity)}
+                    onMouseEnter={() => onEntityHover?.(entity)}
+                    onMouseLeave={() => onEntityHover?.(null)}
+                    onFocus={() => onEntityHover?.(entity)}
+                    onBlur={() => onEntityHover?.(null)}
+                    aria-label={`Explore ${labelTexts[layer.role]}`}
+                    className={`pointer-events-auto block w-full h-auto cursor-pointer focus:outline-none transition-transform duration-300 ${
+                      isThisHovered
+                        ? 'scale-[1.04]'
+                        : isThisFocused
+                        ? 'scale-[1.05]'
+                        : 'hover:scale-[1.02]'
+                    }`}
+                  >
+                    <img
+                      src={layer.src}
+                      alt={layer.alt}
+                      aria-hidden="true"
+                      draggable={false}
+                      onLoad={handleImageLoad}
+                      className="w-full h-auto block select-none pointer-events-none transition-all duration-500"
+                      style={{
+                        filter: imageFilter,
+                      }}
+                    />
+                  </button>
+                ) : (
+                  <img
+                    src={layer.src}
+                    alt={layer.alt}
+                    aria-hidden="true"
+                    draggable={false}
+                    onLoad={handleImageLoad}
+                    className="w-full h-auto block select-none pointer-events-none transition-all duration-500"
+                    style={{
+                      filter: imageFilter,
+                    }}
+                  />
+                )}
               </div>
             );
           })}
