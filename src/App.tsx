@@ -4,18 +4,30 @@ import { AppOverlay } from './components/overlay/AppOverlay';
 import { usePrefersReducedMotion } from './hooks/usePrefersReducedMotion';
 import { useWormholeTravel } from './hooks/useWormholeTravel';
 import { Destination, DestinationId, InteractionPhase, NavigationMode } from './types/navigation';
-import { GUIDE_DIALOGUES } from './data/destinations';
+import { GUIDE_DIALOGUES, VISIBLE_DESTINATIONS } from './data/destinations';
 
 export const App: React.FC = () => {
   const systemPrefersReducedMotion = usePrefersReducedMotion();
   const [galaxyFormed, setGalaxyFormed] = useState<boolean>(false);
 
+  // Check URL query parameters for direct previewing (e.g. ?phase=destination&dest=about)
+  const initialParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const initialPhaseParam = (initialParams?.get('phase') as InteractionPhase) || null;
+  const initialDestParam = initialParams?.get('dest');
+  const matchedDest = initialDestParam ? VISIBLE_DESTINATIONS.find((d) => d.id === initialDestParam) ?? null : null;
+
   // Interaction & Navigation State
-  const [phase, setPhase] = useState<InteractionPhase>('arrival');
+  const [phase, setPhase] = useState<InteractionPhase>(
+    initialPhaseParam === 'destination' ? 'destination' : 'arrival'
+  );
   const [dialogueStep, setDialogueStep] = useState<number>(0);
   const [navigationMode, setNavigationMode] = useState<NavigationMode | null>(null);
-  const [selectedDestination, setSelectedDestination] = useState<DestinationId | null>(null);
-  const [activeDestination, setActiveDestination] = useState<Destination | null>(null);
+  const [selectedDestination, setSelectedDestination] = useState<DestinationId | null>(
+    initialPhaseParam === 'destination' && matchedDest ? matchedDest.id : null
+  );
+  const [activeDestination, setActiveDestination] = useState<Destination | null>(
+    initialPhaseParam === 'destination' ? (matchedDest ?? VISIBLE_DESTINATIONS[0]) : null
+  );
 
   const isReducedMotion = systemPrefersReducedMotion;
 

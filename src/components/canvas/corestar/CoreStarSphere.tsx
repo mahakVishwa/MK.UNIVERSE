@@ -8,139 +8,144 @@ interface CoreStarSphereProps {
 }
 
 const vertexShader = /* glsl */ `
-  uniform float uTime;
-  uniform float uReducedMotion;
-
-  varying vec3 vNormal;
-  varying vec3 vPosition;
-  varying vec3 vViewPosition;
-
+  varying vec2 vUv;
   void main() {
-    vNormal = normalize(normalMatrix * normal);
-    vPosition = position;
-
-    // Solar plasma surface ripple
-    float disp = 0.0;
-    if (uReducedMotion < 0.5) {
-      disp = sin(position.x * 4.2 + uTime * 1.5)
-           * cos(position.y * 4.2 + uTime * 1.2)
-           * sin(position.z * 4.2 + uTime * 1.6) * 0.024;
-    }
-
-    vec3 deformed = position + normal * disp;
-    vec4 mvPosition = modelViewMatrix * vec4(deformed, 1.0);
-    vViewPosition = -mvPosition.xyz;
-    gl_Position = projectionMatrix * mvPosition;
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
 const fragmentShader = /* glsl */ `
+  uniform sampler2D uTexture;
   uniform float uTime;
-  uniform float uReducedMotion;
   uniform float uDim;
-
-  varying vec3 vNormal;
-  varying vec3 vPosition;
-  varying vec3 vViewPosition;
-
-  float hash(vec3 p) {
-    p = fract(p * 0.3183099 + 0.1);
-    p *= 17.0;
-    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-  }
-
-  float noise(vec3 x) {
-    vec3 i = floor(x);
-    vec3 f = fract(x);
-    f = f * f * (3.0 - 2.0 * f);
-
-    return mix(mix(mix(hash(i + vec3(0, 0, 0)), hash(i + vec3(1, 0, 0)), f.x),
-                   mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),
-               mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x),
-                   mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
-  }
+  uniform float uPulseSpeed;
+  varying vec2 vUv;
 
   void main() {
-    vec3 viewDir = normalize(vViewPosition);
-    vec3 norm = normalize(vNormal);
+    vec2 uv = vUv;
+    vec4 tex = texture2D(uTexture, uv);
 
-    vec3 warmWhite = vec3(0.988, 0.973, 0.941); // #fcf8f0
-    vec3 champagne = vec3(0.788, 0.718, 0.561); // #c9b78f
-    vec3 goldenCore = vec3(0.910, 0.780, 0.520); // #e8c785
-    vec3 deepDust = vec3(0.220, 0.180, 0.230);   // #382e3b
+    // Key out pure black background with smooth starlight threshold
+    float brightness = max(tex.r, max(tex.g, tex.b));
+    float alpha = smoothstep(0.03, 0.15, brightness);
 
-    float t = uReducedMotion < 0.5 ? uTime * 0.35 : 0.0;
-    vec3 coord = vPosition * 2.2 + vec3(0.0, t * 0.2, t * 0.15);
+    if (alpha < 0.005) discard;
 
-    float n1 = noise(coord);
-    float n2 = noise(coord * 2.4 - vec3(t * 0.3, 0.0, t * 0.2));
-    float plasma = n1 * 0.65 + n2 * 0.35;
+    // Organic breathing pulse of solar energy
+    float pulse = 0.92 + 0.08 * sin(uTime * uPulseSpeed);
 
-    vec3 surfaceColor = mix(goldenCore, warmWhite, plasma * 0.85);
-    surfaceColor = mix(surfaceColor, deepDust, (1.0 - plasma) * 0.25);
-
-    float NdotV = max(0.0, dot(norm, viewDir));
-    float limb = pow(NdotV, 0.65);
-    surfaceColor = mix(champagne * 0.85, surfaceColor, limb);
-
-    float fresnel = pow(1.0 - NdotV, 2.4);
-    vec3 finalColor = mix(surfaceColor, warmWhite, fresnel * 0.75);
-
-    // Dimming: scales down surface brightness when an object is focused
-    gl_FragColor = vec4(finalColor * uDim, 0.98);
+    vec3 color = tex.rgb * pulse * uDim;
+    gl_FragColor = vec4(color, alpha * uDim);
   }
 `;
 
+/**
+ * CoreStarSphere: Richly illustrated anime-style celestial Sun.
+ * Hand-painted Makoto Shinkai / Studio Ghibli cosmic fantasy aesthetic.
+ * Layered with animated plasma swirls, solar prominences, and atmospheric golden corona glow.
+ */
 export const CoreStarSphere: React.FC<CoreStarSphereProps> = ({
   reducedMotion = false,
   isDimmed = false,
 }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
+  const coreRef = useRef<THREE.Mesh>(null);
+  const prominenceRef = useRef<THREE.Mesh>(null);
+  const materialCoreRef = useRef<THREE.ShaderMaterial>(null);
+  const materialProminenceRef = useRef<THREE.ShaderMaterial>(null);
   const dimValRef = useRef<number>(1.0);
 
-  const uniforms = useMemo(
+  // Load hand-painted anime cosmic sun artwork
+  const sunTexture = useMemo(() => {
+    const tex = new THREE.TextureLoader().load('/assets/corestar/sun.jpg');
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    return tex;
+  }, []);
+
+  const uniformsCore = useMemo(
     () => ({
+      uTexture: { value: sunTexture },
       uTime: { value: 0 },
-      uReducedMotion: { value: reducedMotion ? 1.0 : 0.0 },
       uDim: { value: 1.0 },
+      uPulseSpeed: { value: 1.4 },
     }),
-    [reducedMotion]
+    [sunTexture]
+  );
+
+  const uniformsProminences = useMemo(
+    () => ({
+      uTexture: { value: sunTexture },
+      uTime: { value: 0 },
+      uDim: { value: 1.0 },
+      uPulseSpeed: { value: 2.1 },
+    }),
+    [sunTexture]
   );
 
   useFrame((state, delta) => {
     const time = state.clock.getElapsedTime();
 
-    const targetDim = isDimmed ? 0.12 : 1.0;
+    // Smooth dimming when an object is focused
+    const targetDim = isDimmed ? 0.14 : 1.0;
     dimValRef.current = THREE.MathUtils.lerp(
       dimValRef.current,
       targetDim,
       reducedMotion ? 0.25 : 0.05
     );
 
-    if (materialRef.current) {
-      materialRef.current.uniforms.uTime.value = time;
-      materialRef.current.uniforms.uReducedMotion.value = reducedMotion ? 1.0 : 0.0;
-      materialRef.current.uniforms.uDim.value = dimValRef.current;
+    if (materialCoreRef.current) {
+      materialCoreRef.current.uniforms.uTime.value = time;
+      materialCoreRef.current.uniforms.uDim.value = dimValRef.current;
     }
-    if (meshRef.current && !reducedMotion) {
-      meshRef.current.rotation.y += delta * 0.06;
-      meshRef.current.rotation.x += delta * 0.015;
+    if (materialProminenceRef.current) {
+      materialProminenceRef.current.uniforms.uTime.value = time;
+      materialProminenceRef.current.uniforms.uDim.value = dimValRef.current;
+    }
+
+    if (!reducedMotion) {
+      // Layer 1: Core clockwise solar rotation
+      if (coreRef.current) {
+        coreRef.current.rotation.z -= delta * 0.025;
+      }
+      // Layer 2: Prominences counter-rotation and breathing
+      if (prominenceRef.current) {
+        prominenceRef.current.rotation.z += delta * 0.015;
+        const flareScale = 1.08 + Math.sin(time * 1.8) * 0.03;
+        prominenceRef.current.scale.set(flareScale, flareScale, 1.0);
+      }
     }
   });
 
   return (
     <group position={[0, 0, 0]}>
-      {/* Pure, Luminous Procedural Solar Plasma Sphere */}
-      <mesh ref={meshRef} position={[0, 0, 0]}>
-        <sphereGeometry args={[1.15, 64, 64]} />
+      {/* Layer 1: Richly Illustrated Core Plasma Sun (Size: 4.8 x 4.8) */}
+      <mesh ref={coreRef} position={[0, 0, 0]}>
+        <planeGeometry args={[4.8, 4.8]} />
         <shaderMaterial
-          ref={materialRef}
+          ref={materialCoreRef}
           vertexShader={vertexShader}
           fragmentShader={fragmentShader}
-          uniforms={uniforms}
+          uniforms={uniformsCore}
           transparent={true}
-          depthWrite={true}
+          depthWrite={false}
+          blending={THREE.NormalBlending}
+        />
+      </mesh>
+
+      {/* Layer 2: Swirling Anime Solar Prominences & Tendril Flares */}
+      <mesh ref={prominenceRef} position={[0, 0, 0.04]} scale={[1.08, 1.08, 1]}>
+        <planeGeometry args={[4.8, 4.8]} />
+        <shaderMaterial
+          ref={materialProminenceRef}
+          vertexShader={vertexShader}
+          fragmentShader={fragmentShader}
+          uniforms={uniformsProminences}
+          transparent={true}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
     </group>
